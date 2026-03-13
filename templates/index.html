@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VeriProof-AI | Digital Evidence Verifier</title>
+  <style>
+    :root {
+      --primary: #1a237e;
+      --accent:  #0288d1;
+      --green:   #2e7d32;
+      --orange:  #e65100;
+      --red:     #b71c1c;
+      --bg:      #f4f6fb;
+      --card:    #ffffff;
+      --border:  #dde3f0;
+      --text:    #1c2340;
+      --muted:   #6b7a99;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, #283593 100%);
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,.25);
+    }
+    header .logo { font-size: 2rem; }
+    header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: .5px; }
+    header p  { font-size: .9rem; opacity: .8; margin-top: .2rem; }
+
+    /* ── Layout ── */
+    main { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+
+    /* ── Upload Card ── */
+    .upload-card {
+      background: var(--card);
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+      transition: border-color .2s, background .2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .upload-card.drag-over {
+      border-color: var(--accent);
+      background: #e8f4fd;
+    }
+    .upload-card .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    .upload-card h2 { font-size: 1.3rem; margin-bottom: .5rem; }
+    .upload-card p  { color: var(--muted); font-size: .95rem; }
+
+    #fileInput { display: none; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: .7rem 1.6rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1.2rem;
+      transition: background .15s, transform .1s;
+    }
+    .btn:hover  { background: #0277bd; }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { background: #90caf9; cursor: not-allowed; }
+
+    .file-info {
+      margin-top: 1rem;
+      font-size: .9rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Loading ── */
+    .spinner {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      padding: 2rem;
+      font-size: 1.1rem;
+      color: var(--muted);
+    }
+    .spinner.active { display: flex; }
+    .spin {
+      width: 32px; height: 32px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results ── */
+    #results { display: none; margin-top: 2rem; }
+
+    .verdict-banner {
+      padding: 1.5rem 2rem;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+      margin-bottom: 1.5rem;
+      color: white;
+    }
+    .verdict-banner.green  { background: var(--green); }
+    .verdict-banner.orange { background: var(--orange); }
+    .verdict-banner.red    { background: var(--red); }
+    .verdict-banner .v-icon { font-size: 2.5rem; }
+    .verdict-banner h2 { font-size: 1.4rem; font-weight: 800; letter-spacing: .5px; }
+    .verdict-banner p  { font-size: .95rem; opacity: .9; margin-top: .3rem; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    @media(max-width:640px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.4rem;
+    }
+    .card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 1rem;
+      padding-bottom: .5rem;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .kv { display: flex; flex-direction: column; gap: .6rem; }
+    .kv-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; font-size: .88rem; }
+    .kv-row .k { color: var(--muted); flex-shrink: 0; }
+    .kv-row .v { font-family: monospace; font-size: .82rem; word-break: break-all; text-align: right; }
+
+    .badge {
+      display: inline-block;
+      padding: .2rem .7rem;
+      border-radius: 20px;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .badge-green  { background: #c8e6c9; color: var(--green); }
+    .badge-orange { background: #ffe0b2; color: var(--orange); }
+    .badge-red    { background: #ffcdd2; color: var(--red); }
+
+    .anomaly-list { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+    .anomaly-list li {
+      font-size: .88rem;
+      padding: .5rem .8rem;
+      background: #fff3e0;
+      border-left: 3px solid var(--orange);
+      border-radius: 0 6px 6px 0;
+    }
+    .no-issues {
+      font-size: .9rem;
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .progress-bar-wrap { background: var(--border); border-radius: 20px; height: 10px; margin-top: .4rem; }
+    .progress-bar { height: 10px; border-radius: 20px; transition: width .5s; }
+
+    .full-col { grid-column: 1 / -1; }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: .85rem;
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔍</div>
+  <div>
+    <h1>VeriProof-AI</h1>
+    <p>Digital Evidence Authenticity Verification System</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Upload Area -->
+  <div class="upload-card" id="dropZone">
+    <div class="icon">📁</div>
+    <h2>Upload Digital Evidence</h2>
+    <p>Images (JPG, PNG, TIFF, BMP, WebP) or PDF documents</p>
+    <button class="btn" onclick="document.getElementById('fileInput').click()">
+      📂 Choose File
+    </button>
+    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.bmp,.tiff,.webp,.gif,.pdf"/>
+    <div class="file-info" id="fileInfo"></div>
+    <button class="btn" id="analyzeBtn" onclick="analyzeFile()" style="display:none; background:#1a237e;">
+      🔬 Analyze Evidence
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="spinner" id="spinner">
+    <div class="spin"></div>
+    Analyzing file integrity &amp; metadata…
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Verdict Banner -->
+    <div class="verdict-banner" id="verdictBanner">
+      <div class="v-icon" id="verdictIcon"></div>
+      <div>
+        <h2 id="verdictText"></h2>
+        <p id="verdictSub"></p>
+      </div>
+    </div>
+
+    <div class="grid">
+
+      <!-- File Info -->
+      <div class="card">
+        <h3>📄 File Information</h3>
+        <div class="kv" id="fileInfoCard"></div>
+      </div>
+
+      <!-- Hash Values -->
+      <div class="card">
+        <h3>🔐 Cryptographic Hashes</h3>
+        <div class="kv" id="hashCard"></div>
+      </div>
+
+      <!-- ELA -->
+      <div class="card">
+        <h3>🖼️ ELA Analysis</h3>
+        <div id="elaCard"></div>
+      </div>
+
+      <!-- Metadata -->
+      <div class="card">
+        <h3>📋 Metadata</h3>
+        <div id="metaCard"></div>
+      </div>
+
+      <!-- Anomalies — full width -->
+      <div class="card full-col">
+        <h3>⚠️ Detected Anomalies &amp; Risk Factors</h3>
+        <div id="anomalyCard"></div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>VeriProof-AI &copy; 2024 — AI-powered digital evidence verification for courts, police, and institutions</footer>
+
+<script>
+  const dropZone   = document.getElementById("dropZone");
+  const fileInput  = document.getElementById("fileInput");
+  const fileInfo   = document.getElementById("fileInfo");
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  let selectedFile = null;
+
+  // Drag & drop
+  dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    fileInfo.textContent = `Selected: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    analyzeBtn.style.display = "inline-flex";
+    document.getElementById("results").style.display = "none";
+  }
+
+  async function analyzeFile() {
+    if (!selectedFile) return;
+    
+    analyzeBtn.disabled = true;
+    document.getElementById("spinner").classList.add("active");
+    document.getElementById("results").style.display = "none";
+
+    const fd = new FormData();
+    fd.append("file", selectedFile);
+
+    try {
+      const res  = await fetch("/analyze", { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (data.error) {
+        alert("Error: " + data.error);
+        return;
+      }
+      renderResults(data.analysis);
+    } catch (err) {
+      alert("Request failed: " + err.message);
+    } finally {
+      analyzeBtn.disabled = false;
+      document.getElementById("spinner").classList.remove("active");
+    }
+  }
+
+  function renderResults(a) {
+    const verdict = a.verdict;
+    const colorMap = { green: "#2e7d32", orange: "#e65100", red: "#b71c1c" };
+    const iconMap  = { green: "✅", orange: "⚠️", red: "🚨" };
+
+    // Verdict banner
+    const banner = document.getElementById("verdictBanner");
+    banner.className = "verdict-banner " + verdict.color;
+    document.getElementById("verdictIcon").textContent = iconMap[verdict.color];
+    document.getElementById("verdictText").textContent = verdict.verdict;
+    document.getElementById("verdictSub").textContent  =
+      `Risk Score: ${verdict.risk_score}/100 · ${verdict.confidence}`;
+
+    // File Info
+    const fi = a.file_info;
+    document.getElementById("fileInfoCard").innerHTML = kv([
+      ["Filename",   fi.original_filename || fi.filename],
+      ["Size",       fi.size_kb + " KB"],
+    ]);
+
+    // Hashes
+    const h = fi.hashes || {};
+    document.getElementById("hashCard").innerHTML = kv([
+      ["MD5",    h.md5    || "N/A"],
+      ["SHA1",   h.sha1   || "N/A"],
+      ["SHA256", h.sha256 || "N/A"],
+    ]);
+
+    // ELA
+    const ela = a.ela?.ela || {};
+    let elaHtml = "";
+    if (ela.ela_performed) {
+      const p = ela.tamper_probability || 0;
+      const col = p < 25 ? "#2e7d32" : p < 50 ? "#e65100" : "#b71c1c";
+      elaHtml = `
+        <div class="kv">
+          <div class="kv-row"><span class="k">Tamper Probability</span><span class="v" style="color:${col};font-weight:700">${p}%</span></div>
+          <div class="kv-row"><span class="k">Mean Error</span><span class="v">${ela.mean_error}</span></div>
+          <div class="kv-row"><span class="k">Std Error</span><span class="v">${ela.std_error}</span></div>
+          <div class="kv-row"><span class="k">Suspicious</span><span class="v">${ela.suspicious_regions ? '<span class="badge badge-red">YES</span>' : '<span class="badge badge-green">NO</span>'}</span></div>
+        </div>
+        <div class="progress-bar-wrap" style="margin-top:.8rem">
+          <div class="progress-bar" style="width:${p}%; background:${col}"></div>
+        </div>`;
+    } else {
+      elaHtml = `<p style="color:var(--muted); font-size:.9rem">${a.ela?.message || "ELA not performed"}</p>`;
+    }
+    document.getElementById("elaCard").innerHTML = elaHtml;
+
+    // Metadata
+    const fs_meta = a.metadata?.file_system || {};
+    document.getElementById("metaCard").innerHTML = kv([
+      ["Created",  fs_meta.created  ? fs_meta.created.replace("T"," ").slice(0,19) : "N/A"],
+      ["Modified", fs_meta.modified ? fs_meta.modified.replace("T"," ").slice(0,19) : "N/A"],
+      ["Size",     fs_meta.size_bytes ? (fs_meta.size_bytes/1024).toFixed(1) + " KB" : "N/A"],
+    ]);
+
+    // Anomalies
+    const factors = verdict.risk_factors || [];
+    let anomalyHtml;
+    if (factors.length === 0) {
+      anomalyHtml = `<p class="no-issues">✅ No anomalies detected. File appears authentic.</p>`;
+    } else {
+      anomalyHtml = `<ul class="anomaly-list">` +
+        factors.map(f => `<li>⚠️ ${escHtml(f)}</li>`).join("") +
+        `</ul>`;
+    }
+    document.getElementById("anomalyCard").innerHTML = anomalyHtml;
+
+    document.getElementById("results").style.display = "block";
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function kv(pairs) {
+    return `<div class="kv">` +
+      pairs.map(([k, v]) =>
+        `<div class="kv-row"><span class="k">${k}</span><span class="v">${escHtml(String(v))}</span></div>`
+      ).join("") +
+      `</div>`;
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+</script>
+
+</body>
+</html>
